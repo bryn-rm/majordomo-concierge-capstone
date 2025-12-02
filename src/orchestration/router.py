@@ -28,10 +28,23 @@ def route(user_message: str) -> RoutingDecision:
     if lower.startswith("log:") or lower.startswith("note:") or "diary" in lower:
         return RoutingDecision(intent="diary_capture", flow=FlowName.DIARY_CAPTURE)
 
-    # Diary reflection
+    # Diary reflection / meta-questions about past entries
     if any(
         phrase in lower
-        for phrase in ["patterns in my entries", "recent entries", "journal", "past notes"]
+        for phrase in [
+            "what have i been saying about",
+            "what have i said about",
+            "show me patterns in my notes",
+            "show me patterns in my diary",
+            "have i been more",
+            "have i been less",
+            "how often do i talk about",
+            "what do my notes say about",
+            "patterns in my entries",
+            "recent entries",
+            "journal",
+            "past notes",
+        ]
     ):
         return RoutingDecision(intent="diary_reflection", flow=FlowName.DIARY_REFLECTION)
 

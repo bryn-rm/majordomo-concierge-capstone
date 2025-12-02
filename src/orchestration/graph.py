@@ -69,7 +69,7 @@ class MajordomoGraph:
 
         elif flow == FlowName.DIARY_REFLECTION:
             trace["agents"].append("scribe")
-            result = await self.scribe.reflect(user_message, ctx_text)
+            result = await self.scribe.reflect(user_id, user_message, ctx_text)
 
         elif flow == FlowName.SMART_HOME:
             trace["agents"].append("sentinel")

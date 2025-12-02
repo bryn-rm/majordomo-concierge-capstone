@@ -1,7 +1,10 @@
-from typing import Dict, Any
+# src/agents/scribe.py
+
+from typing import Dict, Any, Optional
 
 from src.prompts.system_instructions import SCRIBE_BASE
 from src.memory.journal_store import save_entry
+from src.agents.archivist import ArchivistAgent
 
 
 class ScribeAgent:
@@ -9,11 +12,12 @@ class ScribeAgent:
     Scribe agent.
 
     - Capture diary entries ("Log: ...").
-    - Reflect on patterns across recent entries.
+    - For reflection/meta-questions, delegates to ArchivistAgent.
     """
 
-    def __init__(self, llm_client):
+    def __init__(self, llm_client, archivist: Optional[ArchivistAgent] = None):
         self.llm = llm_client
+        self.archivist = archivist
 
     async def capture_entry(
         self,
@@ -59,10 +63,26 @@ Return ONLY the summary text; tags will be stubbed in v1.
             "tags": tags,
         }
 
-    async def reflect(self, user_message: str, ctx_text: str) -> Dict[str, Any]:
+    async def reflect(
+        self,
+        user_id: str,
+        user_message: str,
+        ctx_text: str,
+    ) -> Dict[str, Any]:
         """
-        Reflect over recent entries (which are included in ctx_text).
+        Reflect over past entries.
+
+        For now, this simply delegates to Archivist if available.
+        If no Archivist is set, falls back to a simpler reflection using ctx_text.
         """
+        if self.archivist is not None:
+            return await self.archivist.handle(
+                user_id=user_id,
+                user_message=user_message,
+                ctx_text=ctx_text,
+            )
+
+        # Fallback: use only the context block (recent entries already embedded in ctx_text)
         prompt = f"""
 {SCRIBE_BASE}
 
@@ -74,7 +94,7 @@ User request:
 
 Task:
 1. Identify 2–4 recurring themes in the user's recent notes.
-2. Describe any noticeable changes over time (e.g. stress increasing/decreasing).
+2. Describe any noticeable changes over time.
 3. Suggest 2–3 gentle, practical next steps or reflection questions.
 
 Keep it under 250 words.
