@@ -1,3 +1,5 @@
+# src/agents/majordomo.py
+
 from typing import Dict, Any
 
 from src.orchestration.router import route
@@ -20,6 +22,13 @@ class MajordomoAgent:
         self.system_prompt = MAJORDOMO_BASE
 
     async def handle_message(self, user_id: str, message: str) -> Dict[str, Any]:
+        """
+        Core entrypoint used internally by the system.
+
+        - Routes the message to the appropriate internal flow.
+        - Executes the MajordomoGraph.
+        - Asks the LLM to compose a final user-facing reply.
+        """
         # Figure out intent + flow
         decision = route(message)
 
@@ -47,7 +56,7 @@ Write a concise, user-facing reply that:
 - Restates the key thing you did.
 - Presents the result clearly.
 - Mentions any useful next step or how the user might follow up.
-Keep it under 200 words.
+Keep it under 300 words.
 """.strip()
 
         reply_text = await self.llm.generate(prompt)
@@ -56,3 +65,16 @@ Keep it under 200 words.
             "reply": reply_text,
             "trace": trace,
         }
+
+    async def handle(self, message: str, user_id: str = "default") -> Dict[str, Any]:
+        """
+        Thin convenience wrapper used by external callers (FastAPI, UI, etc.).
+
+        FastAPI calls this:
+
+            await majordomo.handle(message=req.message, user_id=req.user_id)
+
+        Internally we just delegate to `handle_message` to keep a single
+        place where the core logic lives.
+        """
+        return await self.handle_message(user_id=user_id, message=message)

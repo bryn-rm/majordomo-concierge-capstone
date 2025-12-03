@@ -9,9 +9,15 @@ venv/
 
 # Environment variables
 .env
+*.env
 
 # macOS
 .DS_Store
 
 # VS Code
 .vscode/
+
+config/credentials.json
+config/token.json
+data/*.db
+__pycache__/

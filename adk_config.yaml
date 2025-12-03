@@ -2,3 +2,5 @@
 # This tells google-adk which Python function returns your root agent/app.
 
 entrypoint: "src.adk_app:create_app"
+python_path:
+  - src
