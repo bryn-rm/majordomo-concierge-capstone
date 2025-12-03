@@ -1,18 +1,11 @@
-from enum import Enum
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Union
 
 from src.agents.scribe import ScribeAgent
 from src.agents.oracle import OracleAgent
 from src.agents.sentinel import SentinelAgent
 from src.memory import get_dynamic_context
 from src.prompts.dynamic_context import format_dynamic_context
-
-
-class FlowName(str, Enum):
-    KNOWLEDGE = "knowledge"
-    DIARY_CAPTURE = "diary_capture"
-    DIARY_REFLECTION = "diary_reflection"
-    SMART_HOME = "smart_home"
+from src.orchestration.router import FlowName as RouterFlowName
 
 
 class MajordomoGraph:
@@ -42,40 +35,62 @@ class MajordomoGraph:
 
     async def run(
         self,
-        flow: FlowName,
+        flow: Union[RouterFlowName, str],
         user_id: str,
         user_message: str,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         trace: Dict[str, Any] = {
-            "flow": flow.value,
+            "flow": flow.value if hasattr(flow, "value") else str(flow),
             "agents": [],
             "tools": [],
         }
 
+        flow_value = flow.value if hasattr(flow, "value") else str(flow)
+
+        # Map router flow to memory intent for context fetching
+        if flow_value in ("journal", "diary_capture", "diary_reflection"):
+            context_intent = "diary_reflection"
+        elif flow_value in ("home", "smart_home"):
+            context_intent = "smart_home"
+        else:
+            context_intent = "knowledge"
+
         ctx_struct = get_dynamic_context(
             user_id=user_id,
-            intent=flow.value,  # type: ignore[arg-type]
+            intent=context_intent,  # type: ignore[arg-type]
             query=user_message,
         )
         ctx_text = format_dynamic_context(ctx_struct)
 
-        if flow == FlowName.KNOWLEDGE:
+        if flow_value == RouterFlowName.KNOWLEDGE.value:
             trace["agents"].append("oracle")
             result = await self.oracle.handle(user_message, ctx_text)
 
-        elif flow == FlowName.DIARY_CAPTURE:
+        elif flow_value in (
+            RouterFlowName.JOURNAL.value,
+            "diary_capture",
+            "diary_reflection",
+        ):
             trace["agents"].append("scribe")
-            result = await self.scribe.capture_entry(user_id, user_message, ctx_text)
+            # Scribe internally classifies between schedule/log/reflect
+            result = await self.scribe.handle(user_id, user_message, ctx_text)
 
-        elif flow == FlowName.DIARY_REFLECTION:
-            trace["agents"].append("scribe")
-            result = await self.scribe.reflect(user_id, user_message, ctx_text)
-
-        elif flow == FlowName.SMART_HOME:
+        elif flow_value == RouterFlowName.HOME.value or flow_value == "smart_home":
             trace["agents"].append("sentinel")
             result = await self.sentinel.handle(user_id, user_message, ctx_text)
 
         else:
-            result = {"message": "Unsupported flow."}
+            # Fallback to Oracle so the user still gets a response
+            trace["agents"].append("oracle")
+            result = await self.oracle.handle(user_message, ctx_text)
+
+        # Track any tool used by downstream agents (e.g., Oracle's search tool)
+        tool_used = result.get("tool_used")
+        if tool_used:
+            trace["tools"].append(tool_used)
+        tools_used = result.get("tools_used") or []
+        for t in tools_used:
+            if t not in trace["tools"]:
+                trace["tools"].append(t)
 
         return result, trace

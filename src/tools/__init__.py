@@ -17,22 +17,19 @@ TOOL_REGISTRY = {
     "human.approve": approval.request_approval,
 
     # Search tools
-    "search.google": google_search_mcp.google_search,
-    "search.wikipedia": wikipedia_mcp.wikipedia_search,
+    "search.google": google_search_mcp.search,
+    "search.wikipedia": wikipedia_mcp.search,
 
     # Calendar tools
-    # Real Google Calendar:
-    "calendar.add_event": calendar_mcp.add_event,
+    "calendar.create_event": calendar_mcp.add_event,
     "calendar.list_upcoming": calendar_mcp.list_upcoming_events,
-    # Local test versions:
-    "calendar.local_add": calendar_local.add_event,
-    "calendar.local_list": calendar_local.list_upcoming_events,
+
 
     # Journal memory tools
     "memory.journal_recent": journal_tools.recent_journal_entries,
     "memory.journal_search": journal_tools.search_journal_entries,
 
-    # Smart home / Home Assistant (simulated)
+    # Smart home tools
     "smarthome.get_state": home_assistant_mcp.get_home_state,
     "smarthome.set_state": home_assistant_mcp.set_home_state,
 }

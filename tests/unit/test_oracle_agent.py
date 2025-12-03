@@ -11,6 +11,8 @@ from tests.unit.conftest import DummyLLM
         ("What is the latest news on UK interest rates?", True),
         ("today's weather in London", True),
         ("covid updates 2025", True),
+        ("Who won the NBA game last night?", True),
+        ("What was the final score of Lakers vs Celtics?", True),
         ("Who was Ada Lovelace?", False),
         ("Explain quantum mechanics", False),
     ],

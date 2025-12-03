@@ -64,6 +64,7 @@ Keep it under 300 words.
         return {
             "reply": reply_text,
             "trace": trace,
+            "specialist_result": result,
         }
 
     async def handle(self, message: str, user_id: str = "default") -> Dict[str, Any]:

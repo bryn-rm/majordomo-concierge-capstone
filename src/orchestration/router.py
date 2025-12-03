@@ -1,67 +1,143 @@
+# src/orchestration/router.py
+
+from __future__ import annotations
+
 from dataclasses import dataclass
+from enum import Enum
 from typing import Literal
 
-from src.orchestration.graph import FlowName
 
-IntentLiteral = Literal[
-    "knowledge",
-    "diary_capture",
-    "diary_reflection",
-    "smart_home",
-]
+class FlowName(str, Enum):
+    GENERAL = "general"
+    KNOWLEDGE = "knowledge"
+    JOURNAL = "journal"   # Scribe / Archivist / calendar
+    HOME = "home"         # Sentinel / IoT
 
 
 @dataclass
 class RoutingDecision:
-    intent: IntentLiteral
     flow: FlowName
+    reason: str
 
 
 def route(user_message: str) -> RoutingDecision:
     """
-    Heuristic router.
-    Later you can swap this for an LLM-based classifier if you want.
+    Very simple heuristic router.
+
+    IMPORTANT: Order matters.
+    We check for scheduling/journal intents BEFORE knowledge,
+    so things like "add X to my calendar" hit Scribe instead of Oracle.
     """
-    lower = user_message.lower().strip()
+    text = user_message.lower().strip()
 
-    # Diary capture
-    if lower.startswith("log:") or lower.startswith("note:") or "diary" in lower:
-        return RoutingDecision(intent="diary_capture", flow=FlowName.DIARY_CAPTURE)
+    # -------------------------
+    # 1. Scheduling / journal
+    # -------------------------
+    scheduling_phrases = [
+        "add to my calendar",
+        "add this to my calendar",
+        "put this in my calendar",
+        "put it in my calendar",
+        "schedule",
+        "schedule in",
+        "schedule this",
+        "book in",
+        "set a reminder",
+        "remind me",
+        "create an event",
+        "create event",
+    ]
 
-    # Diary reflection / meta-questions about past entries
-    if any(
-        phrase in lower
-        for phrase in [
-            "what have i been saying about",
-            "what have i said about",
-            "show me patterns in my notes",
-            "show me patterns in my diary",
-            "have i been more",
-            "have i been less",
-            "how often do i talk about",
-            "what do my notes say about",
-            "patterns in my entries",
-            "recent entries",
-            "journal",
-            "past notes",
-        ]
-    ):
-        return RoutingDecision(intent="diary_reflection", flow=FlowName.DIARY_REFLECTION)
+    journal_phrases = [
+        "journal",
+        "diary",
+        "note to self",
+        "log this",
+        "write this down",
+        "record this",
+        "remember that",
+    ]
 
-    # Smart home
-    if any(
-        phrase in lower
-        for phrase in [
-            "lights",
-            "thermostat",
-            "smart home",
-            "lock the door",
-            "lock the doors",
-            "unlock the door",
-            "doors",
-        ]
-    ):
-        return RoutingDecision(intent="smart_home", flow=FlowName.SMART_HOME)
+    # If user mentions calendar at all + an "add/schedule" verb, treat as scheduling
+    if "calendar" in text and any(verb in text for verb in ["add", "put", "schedule", "create", "remind"]):
+        return RoutingDecision(
+            flow=FlowName.JOURNAL,
+            reason="calendar + scheduling verb → journal/scheduling flow",
+        )
 
-    # Default: knowledge
-    return RoutingDecision(intent="knowledge", flow=FlowName.KNOWLEDGE)
+    # Generic scheduling phrases
+    if any(phrase in text for phrase in scheduling_phrases):
+        return RoutingDecision(
+            flow=FlowName.JOURNAL,
+            reason="scheduling/reminder intent → journal flow",
+        )
+
+    # Generic journalling phrases
+    if any(phrase in text for phrase in journal_phrases):
+        return RoutingDecision(
+            flow=FlowName.JOURNAL,
+            reason="journal/diary intent → journal flow",
+        )
+
+    # -------------------------
+    # 2. Home / IoT (Sentinel)
+    # -------------------------
+    home_keywords = [
+        "lights",
+        "light on",
+        "light off",
+        "thermostat",
+        "heating",
+        "temperature",
+        "aircon",
+        "smart plug",
+        "lock the door",
+        "unlock the door",
+        "front door",
+        "garage door",
+    ]
+
+    if any(kw in text for kw in home_keywords):
+        return RoutingDecision(
+            flow=FlowName.HOME,
+            reason="home/IoT-related intent → sentinel flow",
+        )
+
+    # -------------------------
+    # 3. Knowledge (Oracle)
+    # -------------------------
+    knowledge_triggers = [
+        "who ",
+        "what ",
+        "when ",
+        "where ",
+        "why ",
+        "how ",
+        "latest",
+        "news",
+        "update",
+        "price",
+        "score",
+        "result",
+        "weather",
+        "population",
+        "definition",
+        "meaning",
+        "history",
+        "information",
+        "info",
+    ]
+
+    if "?" in text or any(kw in text for kw in knowledge_triggers):
+        return RoutingDecision(
+            flow=FlowName.KNOWLEDGE,
+            reason="question/information intent → oracle flow",
+        )
+
+    # -------------------------
+    # 4. Fallback
+    # -------------------------
+    return RoutingDecision(
+        flow=FlowName.GENERAL,
+        reason="default → general conversation flow",
+    )

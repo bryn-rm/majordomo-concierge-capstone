@@ -1,38 +1,41 @@
+# src/tools/mcp/wikipedia_mcp.py
+
 from typing import List, Dict, Any
 import httpx
 
-WIKIPEDIA_SEARCH_URL = "https://en.wikipedia.org/w/rest.php/v1/search/title"
+WIKI_API_ENDPOINT = "https://en.wikipedia.org/w/api.php"
 
 
-async def wikipedia_search(query: str, limit: int = 3) -> List[Dict[str, Any]]:
+async def search(query: str, limit: int = 3) -> List[Dict[str, Any]]:
     """
-    Simple Wikipedia search tool.
+    Perform a simple Wikipedia search.
 
-    Args:
-        query: Search query.
-        limit: Max number of results.
-
-    Returns:
-        List of dicts with: title, description, url.
+    Returns a list of dicts: [{title, description, url}, ...]
     """
-    params = {"q": query, "limit": limit}
+    params = {
+        "action": "query",
+        "list": "search",
+        "srsearch": query,
+        "format": "json",
+        "srlimit": limit,
+    }
 
     async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.get(WIKIPEDIA_SEARCH_URL, params=params)
+        resp = await client.get(WIKI_API_ENDPOINT, params=params)
         resp.raise_for_status()
         data = resp.json()
 
-    results: List[Dict[str, Any]] = []
-    for page in data.get("pages", []):
-        title = page.get("title", "")
-        excerpt = page.get("excerpt", "")
-        key = page.get("key", "")
-        url = f"https://en.wikipedia.org/wiki/{key}" if key else ""
+    search_results = data.get("query", {}).get("search", []) or []
 
+    results: List[Dict[str, Any]] = []
+    for item in search_results[:limit]:
+        title = item.get("title", "")
+        snippet = item.get("snippet", "")
+        url = f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}"
         results.append(
             {
                 "title": title,
-                "description": excerpt,
+                "description": snippet,
                 "url": url,
             }
         )

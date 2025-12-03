@@ -78,6 +78,15 @@ def add_event(
     """
     service = _get_calendar_service()
 
+    start_iso = start_iso.rstrip()
+    end_iso = end_iso.rstrip() if end_iso else None
+
+    # Accept trailing Z timezone
+    if start_iso.endswith("Z"):
+        start_iso = start_iso[:-1] + "+00:00"
+    if end_iso and end_iso.endswith("Z"):
+        end_iso = end_iso[:-1] + "+00:00"
+
     start_dt = datetime.fromisoformat(start_iso)
     if end_iso is None:
         end_dt = start_dt + timedelta(hours=1)
